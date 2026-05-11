@@ -1,0 +1,35 @@
+{
+  "name": "lfg-builder",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "clean": "rm -rf .next",
+    "free:3000": "sh -c 'p=$(lsof -tiTCP:3000 -sTCP:LISTEN 2>/dev/null); [ -n \"$p\" ] && kill -9 $p; exit 0'",
+    "predev": "npm run free:3000",
+    "dev": "next dev --turbopack -p 3000",
+    "dev:fresh": "npm run free:3000 && npm run clean && next dev --turbopack -p 3000",
+    "dev:reset": "npm run dev:fresh",
+    "dev:webpack": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "generate:lfg": "node scripts/generate-lfg-placeholders.mjs"
+  },
+  "dependencies": {
+    "gif-encoder-2": "^1.0.5",
+    "next": "15.5.9",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.34.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.9",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

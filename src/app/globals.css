@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+:root {
+  /* Stripe-internal-home inspired palette (tune against https://home.corp.stripe.com/) */
+  --sd-page-bg: #f6f9fc;
+  --sd-surface: #ffffff;
+  --sd-border: #e3e8ee;
+  --sd-border-strong: #cbd5e1;
+  --sd-text: #0a2540;
+  --sd-text-secondary: #425466;
+  --sd-accent: #635bff;
+  --sd-accent-hover: #4f46e5;
+  --sd-focus-ring: rgba(99, 91, 255, 0.35);
+  --sd-danger-bg: #fef2f2;
+  --sd-danger-text: #9e2146;
+  --sd-radius-lg: 12px;
+  --sd-radius-md: 8px;
+  --sd-shadow-card: 0 1px 2px rgba(15, 31, 51, 0.06), 0 4px 12px rgba(15, 31, 51, 0.04);
+}
+
+body {
+  background: var(--sd-page-bg);
+  color: var(--sd-text);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.sd-heading {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--sd-text);
+}
+
+.sd-card {
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  box-shadow: var(--sd-shadow-card);
+}
+
+.sd-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--sd-text-secondary);
+}
+
+.sd-input {
+  width: 100%;
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-md);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--sd-text);
+  background: var(--sd-surface);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.sd-input:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+  box-shadow: 0 0 0 3px var(--sd-focus-ring);
+}
+
+.sd-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sd-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.125rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--sd-accent);
+  border: none;
+  border-radius: var(--sd-radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sd-btn-primary:hover:not(:disabled) {
+  background: var(--sd-accent-hover);
+}
+
+.sd-btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sd-focus-ring);
+}
+
+.sd-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sd-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1.125rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--sd-text);
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-border-strong);
+  border-radius: var(--sd-radius-md);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.sd-btn-secondary:hover:not(:disabled) {
+  border-color: var(--sd-text-secondary);
+  background: var(--sd-page-bg);
+}
+
+.sd-btn-secondary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sd-focus-ring);
+}
+
+.sd-btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sd-dropzone {
+  border: 2px dashed var(--sd-border-strong);
+  border-radius: var(--sd-radius-lg);
+  padding: 2rem 1.25rem;
+  text-align: center;
+  background: linear-gradient(180deg, #fafbfd 0%, var(--sd-surface) 100%);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.sd-dropzone[data-active="true"] {
+  border-color: var(--sd-accent);
+  background: rgba(99, 91, 255, 0.04);
+}
+
+.sd-muted {
+  color: var(--sd-text-secondary);
+  font-size: 0.875rem;
+}
+
+.sd-error {
+  font-size: 0.875rem;
+  color: var(--sd-danger-text);
+  background: var(--sd-danger-bg);
+  border-radius: var(--sd-radius-md);
+  padding: 0.75rem 1rem;
+}
+
+.sd-preview-box {
+  width: 100px;
+  height: 100px;
+  border-radius: var(--sd-radius-md);
+  border: 1px solid var(--sd-border);
+  background: #fff;
+  overflow: hidden;
+}
+
+/* Only the direct GIF preview; nested crop preview images use explicit pixel size + transform. */
+.sd-preview-box > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
