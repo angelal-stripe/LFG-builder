@@ -119,11 +119,6 @@ export default function Home() {
     return () => window.removeEventListener("paste", onPaste);
   }, [busy]);
 
-  const clearGifForReposition = useCallback(() => {
-    revokeObjectUrlsOnce([gifPreviewUrlRef.current]);
-    setGifPreviewUrl(null);
-  }, []);
-
   const pasteFromClipboard = useCallback(async () => {
     if (busy) return;
     setError(null);
@@ -378,12 +373,6 @@ export default function Home() {
                       <span>Smaller</span>
                       <span>Larger</span>
                     </div>
-                    <p className="sd-muted text-xs">
-                      Only the photo resizes — the frame stays {STICKER_OUTPUT_SIZE}×{STICKER_OUTPUT_SIZE}. 100% fills the
-                      frame edge-to-edge on the short side; smaller adds white padding; larger crops. Hold{" "}
-                      <kbd className="rounded px-1">Ctrl</kbd> / <kbd className="rounded px-1">⌘</kbd> and scroll on the
-                      preview to resize.
-                    </p>
                   </div>
                 ) : null}
 
@@ -445,11 +434,9 @@ export default function Home() {
                     ) : null}
                   </div>
                   <p className="sd-muted max-w-sm min-w-0 flex-1 text-sm leading-relaxed">
-                    The preview is a fixed {STICKER_OUTPUT_SIZE}×{STICKER_OUTPUT_SIZE} window with a white background.
-                    Your photo starts centered and filling the square; drag in any direction — parts outside the window
-                    are hidden here and cropped in the GIF. Replace overlays in{" "}
-                    <code className="rounded bg-[var(--sd-page-bg)] px-1 py-0.5 text-xs">public/lfg/</code> and update{" "}
-                    <code className="rounded bg-[var(--sd-page-bg)] px-1 py-0.5 text-xs">src/lib/lfgVariants.json</code>.
+                    {
+                      "Position the photo by changing its size and dragging so the Stripe's face is centered above the LFG text."
+                    }
                   </p>
                 </div>
               </div>
@@ -463,14 +450,6 @@ export default function Home() {
                 onClick={runRender}
               >
                 {busy ? "Generating…" : "Generate"}
-              </button>
-              <button
-                type="button"
-                className="sd-btn-secondary"
-                disabled={!gifPreviewUrl || busy}
-                onClick={clearGifForReposition}
-              >
-                Reposition photo
               </button>
             </div>
           </li>
@@ -502,14 +481,6 @@ export default function Home() {
                   {/* eslint-disable-next-line @next/next/no-img-element -- blob GIF preview */}
                   <img src={gifPreviewUrl} alt="" width={100} height={100} className="h-full w-full object-contain" />
                 </div>
-                <p className="sd-muted max-w-sm min-w-0 flex-1 text-sm leading-relaxed">
-                  The GIF is shown at {Math.round(SLACK_REACTION_PREVIEW_SCALE * 100)}% size to approximate how it reads as
-                  a Slack reaction emoji. Download is still full {STICKER_OUTPUT_SIZE}×{STICKER_OUTPUT_SIZE}. Use{" "}
-                  <strong>Reposition photo</strong> to edit framing, then <strong>Generate</strong> again. Replace
-                  overlays in{" "}
-                  <code className="rounded bg-[var(--sd-page-bg)] px-1 py-0.5 text-xs">public/lfg/</code> and update{" "}
-                  <code className="rounded bg-[var(--sd-page-bg)] px-1 py-0.5 text-xs">src/lib/lfgVariants.json</code>.
-                </p>
               </div>
             ) : null}
 
