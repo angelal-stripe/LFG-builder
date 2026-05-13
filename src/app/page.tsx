@@ -350,7 +350,9 @@ export default function Home() {
             <p className="font-medium text-[var(--sd-text)]">
               <span className="tabular-nums text-[var(--sd-text-secondary)]">1.</span> Copy a profile photo from{" "}
               <a
-                href="https://home.corp.stripe.com/"
+                href="https://go/home"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-[var(--sd-accent)] underline decoration-[var(--sd-accent)] underline-offset-2 hover:text-[var(--sd-accent-hover)]"
               >
                 go/home
@@ -496,7 +498,7 @@ export default function Home() {
             <p className="font-medium text-[var(--sd-text)]">
               <span className="tabular-nums text-[var(--sd-text-secondary)]">3.</span> Download the GIF and upload it to{" "}
               <a
-                href="https://stripe.slack.com/customize/emoji"
+                href="https://go/emoji"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="whitespace-nowrap text-[var(--sd-accent)] underline decoration-[var(--sd-accent)] underline-offset-2 hover:text-[var(--sd-accent-hover)]"
