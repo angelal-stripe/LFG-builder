@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   clipboardFailureMessage,
@@ -26,6 +26,10 @@ import {
 } from "@/lib/photoCropLayout";
 import lfgVariants from "@/lib/lfgVariants.json";
 
+/** On-screen framing preview (CSS px); GIF export stays `STICKER_OUTPUT_SIZE`. */
+const PREVIEW_FRAME_PX = 200;
+const PREVIEW_SCALE = PREVIEW_FRAME_PX / STICKER_OUTPUT_SIZE;
+
 type PastedImage = { blob: Blob; mime: string };
 
 const LFG_GUIDE_OVERLAY_SRC =
@@ -43,6 +47,7 @@ export default function Home() {
 
   const photoPreviewUrlRef = useRef<string | null>(null);
   const gifPreviewUrlRef = useRef<string | null>(null);
+  const renderAbortRef = useRef<AbortController | null>(null);
   const cropFrameRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -67,7 +72,30 @@ export default function Home() {
   }, [photoPreviewUrl]);
 
   useEffect(() => {
-    return () => revokeObjectUrlsOnce([photoPreviewUrlRef.current, gifPreviewUrlRef.current]);
+    return () => {
+      renderAbortRef.current?.abort();
+      revokeObjectUrlsOnce([photoPreviewUrlRef.current, gifPreviewUrlRef.current]);
+    };
+  }, []);
+
+  const commitPastedImage = useCallback((blob: Blob, mime: string) => {
+    if (!ALLOWED_IMAGE_MIME.has(mime)) {
+      setError(
+        `Pasted image isn't a supported format (${ALLOWED_IMAGE_DESCRIPTION}). Your clipboard must contain ${ALLOWED_IMAGE_DESCRIPTION}.`,
+      );
+      return;
+    }
+    if (blob.size > MAX_IMAGE_BYTES) {
+      setError(`Image is too large (max ${MAX_IMAGE_BYTES / (1024 * 1024)} MB).`);
+      return;
+    }
+    setError(null);
+    revokeObjectUrlsOnce([photoPreviewUrlRef.current, gifPreviewUrlRef.current]);
+    setGifPreviewUrl(null);
+    setCropNorm(INITIAL_PASTE_CROP);
+    setPhotoScale(INITIAL_PASTE_PHOTO_SCALE);
+    setPhotoPreviewUrl(URL.createObjectURL(blob));
+    setPastedImage({ blob, mime });
   }, []);
 
   useEffect(() => {
@@ -84,14 +112,7 @@ export default function Home() {
         if (!f) continue;
         if (ALLOWED_IMAGE_MIME.has(f.type)) {
           e.preventDefault();
-          setError(null);
-          revokeObjectUrlsOnce([photoPreviewUrlRef.current, gifPreviewUrlRef.current]);
-          setGifPreviewUrl(null);
-          setCropNorm(INITIAL_PASTE_CROP);
-          setPhotoScale(INITIAL_PASTE_PHOTO_SCALE);
-          const u = URL.createObjectURL(f);
-          setPhotoPreviewUrl(u);
-          setPastedImage({ blob: f, mime: f.type });
+          commitPastedImage(f, f.type);
           return;
         }
       }
@@ -117,11 +138,10 @@ export default function Home() {
 
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [busy]);
+  }, [busy, commitPastedImage]);
 
   const pasteFromClipboard = useCallback(async () => {
     if (busy) return;
-    setError(null);
 
     const read = await readClipboardImage();
     if (!read.ok) {
@@ -129,19 +149,8 @@ export default function Home() {
       return;
     }
 
-    if (read.blob.size > MAX_IMAGE_BYTES) {
-      setError(`Image is too large (max ${MAX_IMAGE_BYTES / (1024 * 1024)} MB).`);
-      return;
-    }
-
-    revokeObjectUrlsOnce([photoPreviewUrlRef.current, gifPreviewUrlRef.current]);
-    setGifPreviewUrl(null);
-    setCropNorm(INITIAL_PASTE_CROP);
-    setPhotoScale(INITIAL_PASTE_PHOTO_SCALE);
-    const u = URL.createObjectURL(read.blob);
-    setPhotoPreviewUrl(u);
-    setPastedImage({ blob: read.blob, mime: read.mime });
-  }, [busy]);
+    commitPastedImage(read.blob, read.mime);
+  }, [busy, commitPastedImage]);
 
   const runRender = useCallback(async () => {
     setBusy(true);
@@ -150,31 +159,19 @@ export default function Home() {
     revokeObjectUrlsOnce([gifPreviewUrlRef.current]);
     setGifPreviewUrl(null);
 
-    const read = await readClipboardImage();
-
-    let source: PastedImage | null = null;
-    if (read.ok) {
-      source = { blob: read.blob, mime: read.mime };
-      setPastedImage(source);
-      revokeObjectUrlsOnce([photoPreviewUrlRef.current]);
-      setPhotoPreviewUrl(URL.createObjectURL(source.blob));
-    } else if (read.reason === "permission" && pastedImage) {
-      source = pastedImage;
-    }
-
-    if (!source) {
-      setError(read.ok ? "Couldn't read an image from the clipboard." : clipboardFailureMessage(read));
+    if (!pastedImage) {
+      setError("Paste a photo first.");
       setBusy(false);
       return;
     }
 
-    if (source.blob.size > MAX_IMAGE_BYTES) {
+    if (pastedImage.blob.size > MAX_IMAGE_BYTES) {
       setError(`Image is too large (max ${MAX_IMAGE_BYTES / (1024 * 1024)} MB).`);
       setBusy(false);
       return;
     }
 
-    const file = new File([source.blob], "clipboard-image", { type: source.mime });
+    const file = new File([pastedImage.blob], "clipboard-image", { type: pastedImage.mime });
     const s = clampPhotoScale(photoScale);
     const body = new FormData();
     body.append("image", file);
@@ -182,10 +179,15 @@ export default function Home() {
     body.append("photoCropNormY", String(cropNorm.normY));
     body.append("photoScale", String(s));
 
+    renderAbortRef.current?.abort();
+    const ac = new AbortController();
+    renderAbortRef.current = ac;
+
     try {
       const res = await fetch("/api/render", {
         method: "POST",
         body,
+        signal: ac.signal,
       });
 
       const buf = await res.arrayBuffer();
@@ -214,19 +216,22 @@ export default function Home() {
       const url = URL.createObjectURL(blob);
       setGifPreviewUrl(url);
     } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        return;
+      }
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setBusy(false);
     }
   }, [pastedImage, cropNorm, photoScale]);
 
-  const downloadGif = () => {
+  const downloadGif = useCallback(() => {
     if (!gifPreviewUrl) return;
     const a = document.createElement("a");
     a.href = gifPreviewUrl;
     a.download = "lfg-sticker.gif";
     a.click();
-  };
+  }, [gifPreviewUrl]);
 
   const onPhotoLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const el = e.currentTarget;
@@ -265,8 +270,8 @@ export default function Home() {
     const dx = e.clientX - d.startX;
     const dy = e.clientY - d.startY;
     setCropNorm({
-      normX: d.rangeX !== 0 ? d.startNormX - dx / d.rangeX : d.startNormX,
-      normY: d.rangeY !== 0 ? d.startNormY - dy / d.rangeY : d.startNormY,
+      normX: d.rangeX !== 0 ? d.startNormX - dx / (d.rangeX * PREVIEW_SCALE) : d.startNormX,
+      normY: d.rangeY !== 0 ? d.startNormY - dy / (d.rangeY * PREVIEW_SCALE) : d.startNormY,
     });
   }, []);
 
@@ -285,27 +290,35 @@ export default function Home() {
     const el = cropFrameRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      if (busy) return;
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       setPhotoScale((prev) => clampPhotoScale(prev * Math.exp(-e.deltaY * 0.002)));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [naturalSize, photoPreviewUrl]);
+  }, [busy, naturalSize, photoPreviewUrl]);
 
-  const layout =
-    naturalSize != null
-      ? computeStickerPhotoLayout(
-          naturalSize.w,
-          naturalSize.h,
-          STICKER_OUTPUT_SIZE,
-          photoScale,
-        )
-      : null;
-  const previewTranslate =
-    layout != null
-      ? computeStickerPhotoPreviewTranslate(layout, cropNorm.normX, cropNorm.normY, STICKER_OUTPUT_SIZE)
-      : { tx: 0, ty: 0 };
+  const layout = useMemo(
+    () =>
+      naturalSize != null
+        ? computeStickerPhotoLayout(
+            naturalSize.w,
+            naturalSize.h,
+            STICKER_OUTPUT_SIZE,
+            photoScale,
+          )
+        : null,
+    [naturalSize, photoScale],
+  );
+
+  const previewTranslate = useMemo(
+    () =>
+      layout != null
+        ? computeStickerPhotoPreviewTranslate(layout, cropNorm.normX, cropNorm.normY, STICKER_OUTPUT_SIZE)
+        : { tx: 0, ty: 0 },
+    [layout, cropNorm.normX, cropNorm.normY],
+  );
   const canDragPhoto = Boolean(photoPreviewUrl && naturalSize && !busy);
 
   return (
@@ -330,9 +343,9 @@ export default function Home() {
               to your clipboard.
             </p>
             <p className="sd-muted mt-2 max-w-xl text-sm">
-              Or use <kbd className="rounded border border-[var(--sd-border-strong)] bg-[var(--sd-page-bg)] px-1.5 py-0.5 font-sans text-xs">⌘V</kbd> /{" "}
+              Use <kbd className="rounded border border-[var(--sd-border-strong)] bg-[var(--sd-page-bg)] px-1.5 py-0.5 font-sans text-xs">⌘V</kbd> /{" "}
               <kbd className="rounded border border-[var(--sd-border-strong)] bg-[var(--sd-page-bg)] px-1.5 py-0.5 font-sans text-xs">Ctrl+V</kbd> on this page if
-              the clipboard button is blocked ({ALLOWED_IMAGE_DESCRIPTION}, up to {MAX_IMAGE_BYTES / (1024 * 1024)} MB).
+              the clipboard button is blocked. Image should be {ALLOWED_IMAGE_DESCRIPTION}, up to {MAX_IMAGE_BYTES / (1024 * 1024)} MB.
             </p>
             <div className="mt-4">
               <button type="button" className="sd-btn-secondary" disabled={busy} onClick={() => void pasteFromClipboard()}>
@@ -351,14 +364,18 @@ export default function Home() {
               <div className="mt-4 space-y-4">
 
                 {layout ? (
-                  <div className="max-w-sm space-y-1">
-                    <label className="sd-muted flex items-center justify-between gap-3 text-sm">
+                  <div className="w-full min-w-0 space-y-1">
+                    <label
+                      htmlFor="photo-scale-range"
+                      className="sd-muted flex items-center justify-between gap-3 text-sm"
+                    >
                       <span>Image size</span>
                       <span className="tabular-nums text-[var(--sd-text)]">
                         {Math.round(clampPhotoScale(photoScale) * 100)}%
                       </span>
                     </label>
                     <input
+                      id="photo-scale-range"
                       type="range"
                       min={PHOTO_SCALE_MIN}
                       max={PHOTO_SCALE_MAX}
@@ -377,7 +394,10 @@ export default function Home() {
                 ) : null}
 
                 <div className="flex flex-wrap items-start gap-6">
-                  <div className="sd-preview-box shrink-0">
+                  <div
+                    className="sd-preview-box shrink-0"
+                    style={{ width: PREVIEW_FRAME_PX, height: PREVIEW_FRAME_PX }}
+                  >
                     {photoPreviewUrl ? (
                       <>
                         {!naturalSize ? (
@@ -386,8 +406,8 @@ export default function Home() {
                             <img
                               src={photoPreviewUrl}
                               alt=""
-                              width={100}
-                              height={100}
+                              width={PREVIEW_FRAME_PX}
+                              height={PREVIEW_FRAME_PX}
                               className="h-full w-full object-cover"
                               onLoad={onPhotoLoad}
                               draggable={false}
@@ -397,7 +417,7 @@ export default function Home() {
                           <div
                             ref={cropFrameRef}
                             role="application"
-                            aria-label="Drag to reposition the photo; content outside this square is clipped like the GIF export"
+                            aria-label="Drag to reposition the photo; content outside this square is clipped like the 100×100 GIF export"
                             className={`relative h-full w-full overflow-hidden bg-white touch-none ${
                               canDragPhoto ? "cursor-grab active:cursor-grabbing" : ""
                             }`}
@@ -410,11 +430,11 @@ export default function Home() {
                             <img
                               src={photoPreviewUrl}
                               alt=""
-                              width={layout.scaledW}
-                              height={layout.scaledH}
+                              width={Math.round(layout.scaledW * PREVIEW_SCALE)}
+                              height={Math.round(layout.scaledH * PREVIEW_SCALE)}
                               className="pointer-events-none absolute left-0 top-0 z-0 max-w-none select-none"
                               style={{
-                                transform: `translate(${previewTranslate.tx}px, ${previewTranslate.ty}px)`,
+                                transform: `translate(${Math.round(previewTranslate.tx * PREVIEW_SCALE)}px, ${Math.round(previewTranslate.ty * PREVIEW_SCALE)}px)`,
                               }}
                               onLoad={onPhotoLoad}
                               draggable={false}
@@ -423,8 +443,8 @@ export default function Home() {
                             <img
                               src={LFG_GUIDE_OVERLAY_SRC}
                               alt=""
-                              width={STICKER_OUTPUT_SIZE}
-                              height={STICKER_OUTPUT_SIZE}
+                              width={PREVIEW_FRAME_PX}
+                              height={PREVIEW_FRAME_PX}
                               className="pointer-events-none absolute inset-0 z-[1] h-full w-full select-none object-fill"
                               draggable={false}
                             />
