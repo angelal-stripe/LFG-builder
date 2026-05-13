@@ -35,6 +35,21 @@ type PastedImage = { blob: Blob; mime: string };
 const LFG_GUIDE_OVERLAY_SRC =
   lfgVariants.files.length > 0 ? `/lfg/${lfgVariants.files[0]}` : "/lfg/1.png";
 
+/** Dotted center lines for aligning the photo in the preview (pointer-events-none). */
+function PreviewCenterGuides({ className }: { className?: string }) {
+  const line = "border-[rgba(10,37,64,0.38)]";
+  return (
+    <div className={className} aria-hidden>
+      <div
+        className={`pointer-events-none absolute bottom-0 left-1/2 top-0 w-0 -translate-x-1/2 border-0 border-l border-dotted ${line}`}
+      />
+      <div
+        className={`pointer-events-none absolute left-0 right-0 top-1/2 h-0 -translate-y-1/2 border-0 border-t border-dotted ${line}`}
+      />
+    </div>
+  );
+}
+
 export default function Home() {
   const [pastedImage, setPastedImage] = useState<PastedImage | null>(null);
   const [busy, setBusy] = useState(false);
@@ -412,6 +427,7 @@ export default function Home() {
                               onLoad={onPhotoLoad}
                               draggable={false}
                             />
+                            <PreviewCenterGuides className="pointer-events-none absolute inset-0 z-[1]" />
                           </div>
                         ) : layout ? (
                           <div
@@ -448,6 +464,7 @@ export default function Home() {
                               className="pointer-events-none absolute inset-0 z-[1] h-full w-full select-none object-fill"
                               draggable={false}
                             />
+                            <PreviewCenterGuides className="pointer-events-none absolute inset-0 z-[2]" />
                           </div>
                         ) : null}
                       </>
